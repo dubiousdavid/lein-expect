@@ -105,9 +105,9 @@
   (if (or (:eval-in-leiningen project)
           (= (:eval-in project) :leiningen))
     `main/exit
-    `(fn [code#]
+    `(fn []
        (shutdown-agents)
-       (System/exit code#))))
+       (System/exit 0))))
 
 (defn mk-run-form [project args]
   (let [[ns-pattern kws] (parse-args args)
@@ -123,7 +123,7 @@
                      `(expect/prun-all :level :ex)
                      :else `(expect/run-all)))
         exit-fn (mk-exit-fn project)]
-    `(do ~form (~exit-fn 0))))
+    `(do ~form (~exit-fn))))
 
 (ex "mk-run-form"
     (mk-run-form {} (list "test.*" ":parallel" ":ex"))

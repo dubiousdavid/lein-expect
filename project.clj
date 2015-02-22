@@ -6,4 +6,5 @@
   :dependencies [[expect "0.1.0"]
                  [cuerdas "0.3.0"]
                  [com.roomkey/example "0.3.0"]]
+  :profiles {:dev {:dependencies [[midje "1.6.3"]]}}
   :eval-in-leiningen true)
