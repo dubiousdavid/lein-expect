@@ -5,5 +5,5 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[expect "0.1.0"]
                  [cuerdas "0.3.0"]
-                 [com.roomkey/example "0.3.0+repl"]]
+                 [com.roomkey/example "0.3.0"]]
   :eval-in-leiningen true)
