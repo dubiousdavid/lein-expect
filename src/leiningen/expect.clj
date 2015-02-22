@@ -92,13 +92,13 @@
   (for [test-path (:test-paths project)]
     [test-path (find-clj-files test-path)]))
 
-(defn gen-require-forms [project]
+(defn mk-require-forms [project]
   (->> (find-test-files project)
        (mapcat (fn [[test-path test-files]]
                  (load-files test-path test-files)))))
 
 (defn mk-init-form [project]
-  (let [require-forms (gen-require-forms project)]
+  (let [require-forms (mk-require-forms project)]
     `(do (require '~'expect) ~@require-forms)))
 
 (defn mk-exit-fn [project]
@@ -134,12 +134,8 @@
     (mk-run-form {} (list)))
 
 (defn expect
-  ""
+  "Main entry point."
   [project & args]
   (let [run-form (mk-run-form project args)
         init-form (mk-init-form project)]
-
-    (println run-form)
-    (println init-form)
-
     (eval-in-project project run-form init-form)))
