@@ -2,9 +2,9 @@
   (:require [cuerdas.core :as str]
             [clojure.java.io :as io]
             [rk.example :refer [ex]]
-            [leiningen.core.project :refer [merge-profiles]]
             [leiningen.core.eval :refer [eval-in-project]]
-            [expect :refer [prun-ns# run-ns# prun-all run-all]]))
+            [leiningen.core.main :as main]
+            expect))
 
 (defn is-keyword? [s]
   (str/starts-with? s ":"))
@@ -75,54 +75,71 @@
       path->ns))
 
 (ex "file->ns"
-    (file->ns "/path" (io/file "/path/to/some_file.clj")))
-
-(defn load-files* [path-prefix files]
-  (let [file->ns' (partial file->ns path-prefix)]
-    (for [file files]
-      (file->ns' file))))
-
-(ex "load-files*"
-    (load-files* "/path/to/test"
-                 [(io/file "/path/to/test/my_file.clj")
-                  (io/file "/path/to/test/dir/my_file.clj")]))
+    (file->ns "/path" (io/file "/path/to/some_file.")))
 
 (defn load-files [path-prefix files]
-  (for [ns-sym (load-files* path-prefix files)]
-    `(require '~ns-sym)))
+  (let [file->ns' (partial file->ns path-prefix)]
+    (for [file files
+          :let [ns-sym (file->ns' file)]]
+      `(require '~ns-sym))))
 
-(defn find-test-files [test-paths]
-  (for [test-path test-paths]
+(ex "load-files"
+    (load-files "/path/to/test"
+                [(io/file "/path/to/test/my_file.clj")
+                 (io/file "/path/to/test/dir/my_file.clj")]))
+
+(defn find-test-files [project]
+  (for [test-path (:test-paths project)]
     [test-path (find-clj-files test-path)]))
 
-(defn gen-require-forms [test-paths]
-  (mapcat (fn [[test-path test-files]] (load-files test-path test-files))
-          (find-test-files test-paths)))
+(defn gen-require-forms [project]
+  (->> (find-test-files project)
+       (mapcat (fn [[test-path test-files]]
+                 (load-files test-path test-files)))))
+
+(defn mk-init-form [project]
+  (let [require-forms (gen-require-forms project)]
+    `(do (require '~'expect) ~@require-forms)))
+
+(defn mk-exit-fn [project]
+  (if (or (:eval-in-leiningen project)
+          (= (:eval-in project) :leiningen))
+    `main/exit
+    `(fn [code#]
+       (shutdown-agents)
+       (System/exit code#))))
+
+(defn mk-run-form [project args]
+  (let [[ns-pattern kws] (parse-args args)
+        form (if ns-pattern
+               (cond (parallel-ns? kws)
+                     `(~'expect/prun-ns# ~ns-pattern :level :ns)
+                     (parallel-ex? kws)
+                     `(~'expect/prun-ns# ~ns-pattern :level :ex)
+                     :else `(~'expect/run-ns# ~ns-pattern))
+               (cond (parallel-ns? kws)
+                     `(expect/prun-all :level :ns)
+                     (parallel-ex? kws)
+                     `(expect/prun-all :level :ex)
+                     :else `(expect/run-all)))
+        exit-fn (mk-exit-fn project)]
+    `(do ~form (~exit-fn 0))))
+
+(ex "mk-run-form"
+    (mk-run-form {} (list "test.*" ":parallel" ":ex"))
+    (mk-run-form {} (list "test.*" ":parallel"))
+    (mk-run-form {} (list "test.*"))
+    (mk-run-form {} (list ":parallel" ":ns"))
+    (mk-run-form {} (list ":parallel" ":ex"))
+    (mk-run-form {} (list)))
 
 (defn expect
   ""
   [project & args]
-  (let [test-paths (:test-paths project)
-        test-profile {:source-paths test-paths}
-        project (merge-profiles project [test-profile])
-        [ns-pattern kws] (parse-args args)
-        test-files (find-test-files project)
-        require-forms (gen-require-forms test-paths)
-        run-form `(run-all)
-        init-form `(do (require '~'expect) ~@require-forms)]
-    (println project)
+  (let [run-form (mk-run-form project args)
+        init-form (mk-init-form project)]
+
     (println run-form)
     (println init-form)
 
-    ;; Run tests
-    (if ns-pattern
-      (cond (parallel-ns? kws)
-            (prun-ns# ns-pattern :level :ns)
-            (parallel-ex? kws)
-            (prun-ns# ns-pattern :level :ex)
-            :else (run-ns# ns-pattern))
-      (cond (parallel-ns? kws)
-            (prun-all :level :ns)
-            (parallel-ex? kws)
-            (prun-all :level :ex)
-            :else (do (println "got here") (eval-in-project project run-form init-form))))))
+    (eval-in-project project run-form init-form)))
