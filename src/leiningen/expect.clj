@@ -1,10 +1,10 @@
 (ns leiningen.expect
   (:require [cuerdas.core :as str]
             [clojure.java.io :as io]
-            [rk.example :refer [ex]]
+            [example.core :refer [ex]]
             [leiningen.core.eval :refer [eval-in-project]]
             [leiningen.core.main :as main]
-            expect))
+            expect.core))
 
 (defn is-keyword? [s]
   (str/starts-with? s ":"))
@@ -99,7 +99,7 @@
 
 (defn mk-init-form [project]
   (let [require-forms (mk-require-forms project)]
-    `(do (require '~'expect) ~@require-forms)))
+    `(do (require '~'expect.core) ~@require-forms)))
 
 (defn mk-exit-fn [project]
   (if (or (:eval-in-leiningen project)
@@ -113,15 +113,15 @@
   (let [[ns-pattern kws] (parse-args args)
         form (if ns-pattern
                (cond (parallel-ns? kws)
-                     `(~'expect/prun-ns# ~ns-pattern :level :ns)
+                     `(~'expect.core/prun-ns# ~ns-pattern :level :ns)
                      (parallel-ex? kws)
-                     `(~'expect/prun-ns# ~ns-pattern :level :ex)
-                     :else `(~'expect/run-ns# ~ns-pattern))
+                     `(~'expect.core/prun-ns# ~ns-pattern :level :ex)
+                     :else `(~'expect.core/run-ns# ~ns-pattern))
                (cond (parallel-ns? kws)
-                     `(expect/prun-all :level :ns)
+                     `(expect.core/prun-all :level :ns)
                      (parallel-ex? kws)
-                     `(expect/prun-all :level :ex)
-                     :else `(expect/run-all)))
+                     `(expect.core/prun-all :level :ex)
+                     :else `(expect.core/run-all)))
         exit-fn (mk-exit-fn project)]
     `(do ~form (~exit-fn))))
 
